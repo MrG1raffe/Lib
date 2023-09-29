@@ -6,13 +6,15 @@ from numpy.typing import NDArray
 from numpy import float_
 from simulation import geometric_brownian_motion
 
+np.seterr(divide='ignore')
+
 
 @dataclass
 class BlackScholes():
     sigma: Union[float, NDArray] = None  # volatility in 1-d model or covariance matrix
     r: float = 0
 
-    def __d1d2(
+    def _d1d2(
         self,
         T: Union[float, NDArray[float_]],
         K: Union[float, NDArray[float_]],
@@ -53,11 +55,53 @@ class BlackScholes():
         Returns:
             Prices of the call/put vanilla options.
         """
-        d1, d2 = self.__d1d2(T, K, S)
+        d1, d2 = self._d1d2(T, K, S)
         if flag == 'c':
             return S * norm.cdf(d1) - np.exp(-self.r*T) * K * norm.cdf(d2)
         if flag == 'p':
             return -S * norm.cdf(-d1) + np.exp(-self.r*T) * K * norm.cdf(-d2)
+
+    def delta(
+        self,
+        T: Union[float, NDArray[float_]],
+        K: Union[float, NDArray[float_]],
+        S: Union[float, NDArray[float_]],
+        flag: str
+    ) -> Union[float, NDArray[float_]]:
+        """
+        Calculates the option delta in the Black-Scholes model
+
+        Args:
+            T: times to maturity.
+            K: strikes.
+            S: spot prices at t = 0.
+            flag: 'c' for calls, 'p' for puts.
+
+        Returns:
+            Vega of the option(s).
+        """
+        d1, _ = self._d1d2(T, K, S)
+        return norm.cdf(d1) if flag == 'c' else -norm.cdf(-d1)
+
+    def gamma(
+        self,
+        T: Union[float, NDArray[float_]],
+        K: Union[float, NDArray[float_]],
+        S: Union[float, NDArray[float_]],
+    ) -> Union[float, NDArray[float_]]:
+        """
+        Calculates the option gamma in the Black-Scholes model
+
+        Args:
+            T: times to maturity.
+            K: strikes.
+            S: spot prices at t = 0.
+
+        Returns:
+            Vega of the option(s).
+        """
+        d1, _ = self._d1d2(T, K, S)
+        return norm.pdf(d1) / (S * self.sigma * np.sqrt(T))
 
     def vega(
         self,
@@ -76,7 +120,7 @@ class BlackScholes():
         Returns:
             Vega of the option(s).
         """
-        d1, _ = self.__d1d2(T, K, S)
+        d1, _ = self._d1d2(T, K, S)
         return S * norm.pdf(d1) * np.sqrt(T)
 
     def simulate_trajectory(

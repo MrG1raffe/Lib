@@ -6,6 +6,8 @@ from numpy.typing import NDArray
 from numpy import float_
 from simulation import geometric_brownian_motion
 
+np.seterr(divide='ignore')
+
 
 @dataclass
 class Black76():
@@ -58,6 +60,48 @@ class Black76():
             return np.exp(-self.r*T) * (F * norm.cdf(d1) - K * norm.cdf(d2))
         if flag == 'p':
             return np.exp(-self.r*T) * (-F * norm.cdf(-d1) + K * norm.cdf(-d2))
+
+    def delta(
+        self,
+        T: Union[float, NDArray[float_]],
+        K: Union[float, NDArray[float_]],
+        F: Union[float, NDArray[float_]],
+        flag: str
+    ) -> Union[float, NDArray[float_]]:
+        """
+        Calculates the option delta in the Black-76 model
+
+        Args:
+            T: times to maturity.
+            K: strikes.
+            F: forward prices at t = 0.
+            flag: 'c' for calls, 'p' for puts.
+
+        Returns:
+            Vega of the option(s).
+        """
+        d1, _ = self._d1d2(T, K, F)
+        return norm.cdf(d1) if flag == 'c' else -norm.cdf(-d1)
+
+    def gamma(
+        self,
+        T: Union[float, NDArray[float_]],
+        K: Union[float, NDArray[float_]],
+        F: Union[float, NDArray[float_]],
+    ) -> Union[float, NDArray[float_]]:
+        """
+        Calculates the option gamma in the Black-76 model
+
+        Args:
+            T: times to maturity.
+            K: strikes.
+            F: forward prices at t = 0.
+
+        Returns:
+            Vega of the option(s).
+        """
+        d1, _ = self._d1d2(T, K, F)
+        return norm.pdf(d1) / (np.exp(-self.r * T) * F * self.sigma * np.sqrt(T))
 
     def vega(
         self,
