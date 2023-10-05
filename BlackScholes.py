@@ -129,7 +129,8 @@ class BlackScholes():
         t_grid: Union[float, NDArray[float_]],
         init_val: Union[float, NDArray[float_]],
         flag: str = "spot",
-        random_state: np.random.Generator = None
+        random_state: np.random.Generator = None,
+        antithetic_variates: bool = False
     ) -> Union[float, NDArray[float_]]:
         """
         Simulates the trajectory of stock or forward in the Black-Scholes model.
@@ -140,6 +141,8 @@ class BlackScholes():
             init_val: the value of process at t = 0.
             flag: "forward" to simulate forward price (without drift). "spot" to simulate spot price.
             random_state: `np.random.Generator` used for simulation.
+            antithetic_variates: whether to use antithetic variantes in simulation. If True, the trajectories
+                in the second half of the sample will use the random numbers opposite to the ones used in the first half.
 
         Returns:
             np.ndarray of shape (n_sample, len(t_grid)) with simulated trajectories if model dimension is 1.
@@ -157,6 +160,7 @@ class BlackScholes():
             init_val=init_val,
             drift=drift,
             covariance=cov,
-            random_state=random_state
+            random_state=random_state,
+            antithetic_variates=antithetic_variates
         )
         return traj
