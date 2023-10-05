@@ -44,7 +44,7 @@ class BlackScholes():
         flag: str
     ) -> Union[float, NDArray[float_]]:
         """
-        Calculates the call option price via Black-Scholes formula
+        Calculates the vanilla option price via Black-Scholes formula
 
         Args:
             T: times to maturity.
@@ -139,7 +139,7 @@ class BlackScholes():
             t_grid: time grid to simulate the price on.
             init_val: the value of process at t = 0.
             flag: "forward" to simulate forward price (without drift). "spot" to simulate spot price.
-            random_state: `np.random.Generator` used for simulation
+            random_state: `np.random.Generator` used for simulation.
 
         Returns:
             np.ndarray of shape (n_sample, len(t_grid)) with simulated trajectories if model dimension is 1.

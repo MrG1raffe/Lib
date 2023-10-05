@@ -5,6 +5,11 @@ from numpy import float_
 from utility import numpyze, is_number
 
 
+'''
+ToDo: Add antithetic variable to the brownian motion simulation.
+'''
+
+
 def brownian_motion(
     n_sample: int,
     t_grid: Union[float, NDArray[float_]],
@@ -31,6 +36,7 @@ def brownian_motion(
     if random_state is None:
         random_state = np.random.default_rng()
     dt = np.diff(np.concatenate([[0], t_grid]))
+    t_grid = numpyze(t_grid)
     if is_number(covariance):
         dim = 1
     else:
@@ -83,7 +89,7 @@ def geometric_brownian_motion(
     W = brownian_motion(
         n_sample=n_sample,
         t_grid=t_grid,
-        init_val=0,
+        init_val=np.zeros(dim),
         drift=drift,
         covariance=covariance,
         random_state=random_state

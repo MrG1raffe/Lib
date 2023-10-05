@@ -14,7 +14,7 @@ class Black76():
     sigma: float = None
     r: float = 0
 
-    def __d1d2(
+    def _d1d2(
         self,
         T: Union[float, NDArray[float_]],
         K: Union[float, NDArray[float_]],
@@ -55,7 +55,7 @@ class Black76():
         Returns:
             Prices of the call/put vanilla options.
         """
-        d1, d2 = self.__d1d2(T, K, F)
+        d1, d2 = self._d1d2(T, K, F)
         if flag == 'c':
             return np.exp(-self.r*T) * (F * norm.cdf(d1) - K * norm.cdf(d2))
         if flag == 'p':
@@ -120,7 +120,7 @@ class Black76():
         Returns:
             Vega of the option(s).
         """
-        d1, _ = self.__d1d2(T, K, F)
+        d1, _ = self._d1d2(T, K, F)
         return np.exp(-self.r * T) * F * norm.pdf(d1) * np.sqrt(T)
 
     def simulate_trajectory(
