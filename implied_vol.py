@@ -7,6 +7,25 @@ from py_vollib.black.implied_volatility import implied_volatility
 iv_lets_be_rational = np.vectorize(implied_volatility)
 
 
+def newton_init_vol(
+    T: Union[float, NDArray[float_]],
+    K: Union[float, NDArray[float_]],
+    F: Union[float, NDArray[float_]]
+) -> Union[float, NDArray[float_]]:
+    """
+    Returns initial volatility for Newton's method.
+
+    Args:
+        T: times to maturity.
+        K: strikes.
+        F: forward prices at t = 0.
+
+    Returns:
+        Initial volatility.
+    """
+    return np.sqrt(2 / T * np.abs(np.log(F / K)))
+
+
 def black_iv(
         option_price: Union[float, NDArray[float_]],
         T: Union[float, NDArray[float_]],
@@ -36,7 +55,7 @@ def black_iv(
     if method == 'LetsBeRational':
         return iv_lets_be_rational(option_price, F, K, r, T, flag)
     if method == 'Newton':
-        sigma = np.sqrt(2 / T * np.abs(np.log(F / K)))
+        sigma = newton_init_vol(T, K, F)
         step = np.inf
         while np.max(np.abs(step)) > tol:
             model = BlackScholes(sigma=sigma, r=r)

@@ -44,7 +44,7 @@ class Black76():
         flag: str
     ) -> Union[float, NDArray[float_]]:
         """
-        Calculates the call option price via Black-76 formula
+        Calculates the vanilla option price via Black-76 formula
 
         Args:
             T: times to maturity.
@@ -60,6 +60,30 @@ class Black76():
             return np.exp(-self.r*T) * (F * norm.cdf(d1) - K * norm.cdf(d2))
         if flag == 'p':
             return np.exp(-self.r*T) * (-F * norm.cdf(-d1) + K * norm.cdf(-d2))
+
+    def digital_price(
+        self,
+        T: Union[float, NDArray[float_]],
+        K: Union[float, NDArray[float_]],
+        F: Union[float, NDArray[float_]],
+        flag: str
+    ) -> Union[float, NDArray[float_]]:
+        """
+        Calculates the digital call or put option price via Black-76 formula
+
+        Args:
+            T: times to maturity.
+            K: strikes.
+            F: forward prices at t = 0.
+            flag: 'c' for calls, 'p' for puts.
+
+        Returns:
+            Prices of the call/put vanilla options.
+        """
+        _, d2 = self._d1d2(T, K, F)
+
+        sign = 1 if flag == 'c' else -1
+        return np.exp(-self.r*T) * norm.cdf(sign * d2)
 
     def delta(
         self,

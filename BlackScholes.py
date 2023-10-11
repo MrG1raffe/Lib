@@ -11,6 +11,9 @@ np.seterr(divide='ignore')
 
 @dataclass
 class BlackScholes():
+    """
+    Will not be updated. Use Black76 instead!
+    """
     sigma: Union[float, NDArray] = None  # volatility in 1-d model or covariance matrix
     r: float = 0
 
@@ -130,7 +133,7 @@ class BlackScholes():
         init_val: Union[float, NDArray[float_]],
         flag: str = "spot",
         random_state: np.random.Generator = None,
-        antithetic_variates: bool = False
+        antithetic_variates: bool = False,
     ) -> Union[float, NDArray[float_]]:
         """
         Simulates the trajectory of stock or forward in the Black-Scholes model.
