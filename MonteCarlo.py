@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.stats import norm
-from typing import Union, NoReturn
+from typing import Union
 from numpy.typing import NDArray
 from numpy import float_
 import matplotlib
@@ -13,7 +13,7 @@ class MonteCarlo():
     confidence_level: Union[float, NDArray[float_]]
     mean: Union[float, NDArray[float_]]
     var: Union[float, NDArray[float_]]
-    sample_size: int
+    size: int
 
     def __init__(
         self,
@@ -21,7 +21,7 @@ class MonteCarlo():
         confidence_level: Union[float, NDArray[float_]] = None,
         accuracy: Union[float, NDArray[float_]] = None,
         axis: int = 0
-    ):
+    ) -> None:
         """
         Calculates the Monte Carlo statistics for the given sample and the corresponding confidence intervals.
 
@@ -34,16 +34,16 @@ class MonteCarlo():
         self.sample = sample
         self.mean = np.mean(sample, axis=axis)
         self.var = np.var(sample, ddof=1, axis=axis)
-        self.sample_size = sample.shape[axis]
+        self.size = sample.shape[axis]
         if confidence_level is not None and accuracy is not None:
             raise ValueError('Either accuracy or confidence level should be specified, not both.')
         if confidence_level is not None:
             self.confidence_level = confidence_level
             quantile = norm.ppf((1 + self.confidence_level) / 2)
-            self.accuracy = quantile * np.sqrt(self.var / self.sample_size)
+            self.accuracy = quantile * np.sqrt(self.var / self.size)
         elif accuracy is not None:
             self.accuracy = accuracy
-            quantile = accuracy * np.sqrt(self.sample_size / self.var)
+            quantile = accuracy * np.sqrt(self.size / self.var)
             self.confidence_level = 2 * norm.cdf(quantile) - 1
         else:
             raise ValueError('Either accuracy or confidence level should be specified.')
@@ -53,8 +53,10 @@ class MonteCarlo():
         step: int = 1,
         ax: matplotlib.axes = None,
         plot_intervals: bool = False,
-        log: bool = False
-    ) -> NoReturn:
+        log: bool = False,
+        color: str = 'b',
+        label: str = 'MC estimator'
+    ):
         """
         Plots a convergence diagram for the given sample.
 
@@ -74,12 +76,27 @@ class MonteCarlo():
         x = np.log(ns) if log else ns
         xlabel = 'log(n)' if log else 'n'
 
-        ax.plot(x, means, 'b', label='MC estimator')
-        ax.grid()
+        ax.plot(x, means, color, label=label)
+        ax.grid('on')
 
         if plot_intervals:
-            ax.plot(x, means - self.accuracy * np.sqrt(self.sample_size / ns), 'r--', label=f'CI of level {self.confidence_level}')
-            ax.plot(x, means + self.accuracy * np.sqrt(self.sample_size / ns), 'r--')
-            ax.fill_between(x, means - self.accuracy * np.sqrt(self.sample_size / ns), means + self.accuracy * np.sqrt(self.sample_size / ns), color='r', alpha=0.1)
+            ax.plot(x, means - self.accuracy * np.sqrt(self.size / ns), color + '--', label=f'CI of level {self.confidence_level}')
+            ax.plot(x, means + self.accuracy * np.sqrt(self.size / ns), color + '--')
+            ax.fill_between(x, means - self.accuracy * np.sqrt(self.size / ns), means + self.accuracy * np.sqrt(self.size / ns), color=color, alpha=0.1)
         ax.legend()
         ax.set_xlabel(xlabel)
+
+    def results(
+        self,
+        decimals=5
+    ) -> str:
+        """
+        Represents results as a string.
+
+        Args:
+            decimals: Number of decimal places to round to.
+
+        Returns:
+            String containing mean and accuracy.
+        """
+        return str(np.round(self.mean, decimals=decimals)) + " ± " + str(np.round(self.accuracy, decimals=decimals))

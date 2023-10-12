@@ -3,6 +3,8 @@ from typing import Union, Any
 from numpy.typing import NDArray
 from numpy import float_
 
+DEFAULT_SEED = 42
+
 
 def is_number(x: Any) -> bool:
     """

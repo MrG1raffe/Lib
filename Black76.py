@@ -4,15 +4,17 @@ from scipy.stats import norm
 from typing import Union, Tuple
 from numpy.typing import NDArray
 from numpy import float_
-from simulation import geometric_brownian_motion
+from Diffusion import Diffusion
 
 np.seterr(divide='ignore')
 
 
 @dataclass
 class Black76():
-    sigma: float = None
+    sigma: Union[float, NDArray[float_]] = None
     r: float = 0
+    correlation: NDArray[float_] = None
+    dim: int = 1
 
     def _d1d2(
         self,
@@ -149,42 +151,57 @@ class Black76():
 
     def simulate_trajectory(
         self,
-        n_sample: int,
+        size: int,
         t_grid: Union[float, NDArray[float_]],
         init_val: Union[float, NDArray[float_]],
         flag: str = "forward",
-        random_state: np.random.Generator = None,
-        antithetic_variates: bool = False
+        rng: np.random.Generator = None,
+        antithetic_variates: bool = False,
+        return_brownian: bool = False
     ) -> Union[float, NDArray[float_]]:
         """
         Simulates the trajectory of stock or forward in the Black model.
 
         Args:
-            n_sample: number of simulated trajectories.
+            size: number of simulated trajectories.
             t_grid: time grid to simulate the price on.
             init_val: the value of process at t = 0.
             flag: "forward" to simulate forward price (without drift). "spot" to simulate spot price.
-            random_state: `np.random.Generator` used for simulation.
+            rng: `np.random.Generator` used for simulation.
             antithetic_variates: whether to use antithetic variantes in simulation. If True, the trajectories
                 in the second half of the sample will use the random numbers opposite to the ones used in the first half.
+            return_brownian: whether to return the underlying correlated brownian motion.
 
         Returns:
-            np.ndarray of shape (n_sample, len(t_grid)) with simulated trajectories if model dimension is 1.
-            np.ndarray of shape (n_sample, dim, len(t_grid)) with simulated trajectories if model dimension greater than 1.
+            np.ndarray of shape (size, len(t_grid)) with simulated trajectories if model dimension is 1.
+            np.ndarray of shape (size, dim, len(t_grid)) with simulated trajectories if model dimension greater than 1.
         """
-        if isinstance(self.sigma, float) or isinstance(self.sigma, int):
-            dim = 1
-        else:
-            dim = len(self.sigma)
-        cov = self.sigma**2 if dim == 1 else self.sigma
-        drift = self.r if flag == "spot" else 0
-        traj = geometric_brownian_motion(
-            n_sample=n_sample,
+        if antithetic_variates:
+            size = size // 2
+        diffusion = Diffusion(
             t_grid=t_grid,
+            size=size,
+            dim=self.dim,
+            rng=rng
+        )
+        drift = self.r if flag == "spot" else 0
+        traj = diffusion.geometric_brownian_motion(
             init_val=init_val,
             drift=drift,
-            covariance=cov,
-            random_state=random_state,
-            antithetic_variates=antithetic_variates
+            correlation=self.correlation,
+            vol=self.sigma,
+            squeeze=True
         )
-        return traj
+        W = diffusion.brownian_motion(correlation=self.correlation, squeeze=True)
+        if antithetic_variates:
+            diffusion.replace_brownian_motion(-diffusion.brownian_motion())
+            traj_2 = diffusion.geometric_brownian_motion(
+                init_val=init_val,
+                drift=drift,
+                correlation=self.correlation,
+                vol=self.sigma,
+                squeeze=True
+            )
+            traj = np.concatenate([traj, traj_2], axis=0)
+            W = np.concatenate([W, -W], axis=0)
+        return traj if not return_brownian else (traj, W)
