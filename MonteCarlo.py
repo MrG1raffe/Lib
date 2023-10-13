@@ -20,7 +20,8 @@ class MonteCarlo():
         sample: NDArray[float_],
         confidence_level: Union[float, NDArray[float_]] = None,
         accuracy: Union[float, NDArray[float_]] = None,
-        axis: int = 0
+        axis: int = 0,
+        control_variate: NDArray[float_] = None
     ) -> None:
         """
         Calculates the Monte Carlo statistics for the given sample and the corresponding confidence intervals.
@@ -30,11 +31,17 @@ class MonteCarlo():
             confidence_level: confidence level for the intervals.
             accuracy: an error estimated via the CLT.
             axis: axis along which the mean to be computed
+            control_variate: control variate to be added to sample with the appropriate weigh which is calculated
+                with the use of adaptive method. Assumed to have zero mean.
         """
-        self.sample = sample
-        self.mean = np.mean(sample, axis=axis)
-        self.var = np.var(sample, ddof=1, axis=axis)
-        self.size = sample.shape[axis]
+        if control_variate is not None:
+            weights = self._adapted_weights(sample, control_variate)
+            self.sample = sample - weights * control_variate
+        else:
+            self.sample = sample
+        self.mean = np.mean(self.sample, axis=axis)
+        self.var = np.var(self.sample, ddof=1, axis=axis)
+        self.size = self.sample.shape[axis]
         if confidence_level is not None and accuracy is not None:
             raise ValueError('Either accuracy or confidence level should be specified, not both.')
         if confidence_level is not None:
@@ -80,9 +87,10 @@ class MonteCarlo():
         ax.grid('on')
 
         if plot_intervals:
-            ax.plot(x, means - self.accuracy * np.sqrt(self.size / ns), color + '--', label=f'CI of level {self.confidence_level}')
-            ax.plot(x, means + self.accuracy * np.sqrt(self.size / ns), color + '--')
-            ax.fill_between(x, means - self.accuracy * np.sqrt(self.size / ns), means + self.accuracy * np.sqrt(self.size / ns), color=color, alpha=0.1)
+            ax.plot(x, means - self.accuracy * np.sqrt(self.size / ns), color + '--', label=f'CI of level {self.confidence_level}', lw=1)
+            ax.plot(x, means + self.accuracy * np.sqrt(self.size / ns), color + '--', lw=1)
+            ax.fill_between(x, means - self.accuracy * np.sqrt(self.size / ns), means + self.accuracy * np.sqrt(self.size / ns),
+                            color=color, alpha=0.05)
         ax.legend()
         ax.set_xlabel(xlabel)
 
@@ -100,3 +108,25 @@ class MonteCarlo():
             String containing mean and accuracy.
         """
         return str(np.round(self.mean, decimals=decimals)) + " ± " + str(np.round(self.accuracy, decimals=decimals))
+
+    def _adapted_weights(
+        self,
+        sample: NDArray[float_],
+        control_variate: NDArray[float_]
+    ) -> NDArray[float_]:
+        """
+        Calculates the control variate weights using adaptive method: for the k-th observation the weight
+        lambda_k = cov(sample[0:k-1], control_variate[0:k-1]) / var(control_variate[0:k-1]).
+        A new sample shall be calculated as 'sample - weights * control_variate'.
+
+        Args:
+            sample: array to compute the mean.
+            control_variate: array of control variates. Assumed to have zero mean.
+
+        Returns:
+            An array of weights corresponding to the given control variates.
+        """
+        weights = np.zeros_like(control_variate)
+        v = np.cumsum(control_variate[:-1]**2)
+        np.divide(np.cumsum(sample[:-1] * control_variate[:-1]), v, out=weights[1:], where=v > 0)
+        return weights

@@ -157,7 +157,8 @@ class Black76():
         flag: str = "forward",
         rng: np.random.Generator = None,
         antithetic_variates: bool = False,
-        return_brownian: bool = False
+        return_brownian: bool = False,
+        return_diffusion: bool = False
     ) -> Union[float, NDArray[float_]]:
         """
         Simulates the trajectory of stock or forward in the Black model.
@@ -171,6 +172,7 @@ class Black76():
             antithetic_variates: whether to use antithetic variantes in simulation. If True, the trajectories
                 in the second half of the sample will use the random numbers opposite to the ones used in the first half.
             return_brownian: whether to return the underlying correlated brownian motion.
+            return_diffusion: whether to return the corresponding diffusion object.
 
         Returns:
             np.ndarray of shape (size, len(t_grid)) with simulated trajectories if model dimension is 1.
@@ -185,6 +187,13 @@ class Black76():
             rng=rng
         )
         drift = self.r if flag == "spot" else 0
+        if antithetic_variates:
+            diffusion.replace_brownian_motion(
+                np.concatenate([
+                    diffusion.brownian_motion(),
+                    -diffusion.brownian_motion()
+                ])
+            )
         traj = diffusion.geometric_brownian_motion(
             init_val=init_val,
             drift=drift,
@@ -193,15 +202,9 @@ class Black76():
             squeeze=True
         )
         W = diffusion.brownian_motion(correlation=self.correlation, squeeze=True)
-        if antithetic_variates:
-            diffusion.replace_brownian_motion(-diffusion.brownian_motion())
-            traj_2 = diffusion.geometric_brownian_motion(
-                init_val=init_val,
-                drift=drift,
-                correlation=self.correlation,
-                vol=self.sigma,
-                squeeze=True
-            )
-            traj = np.concatenate([traj, traj_2], axis=0)
-            W = np.concatenate([W, -W], axis=0)
-        return traj if not return_brownian else (traj, W)
+        if return_diffusion:
+            return traj, diffusion
+        elif return_brownian:
+            return traj, W
+        else:
+            return traj

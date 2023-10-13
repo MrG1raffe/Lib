@@ -4,7 +4,6 @@ from scipy.stats import norm
 from typing import Union, Tuple
 from numpy.typing import NDArray
 from numpy import float_
-from simulation import geometric_brownian_motion
 
 np.seterr(divide='ignore')
 
@@ -125,45 +124,3 @@ class BlackScholes():
         """
         d1, _ = self._d1d2(T, K, S)
         return S * norm.pdf(d1) * np.sqrt(T)
-
-    def simulate_trajectory(
-        self,
-        n_sample: int,
-        t_grid: Union[float, NDArray[float_]],
-        init_val: Union[float, NDArray[float_]],
-        flag: str = "spot",
-        random_state: np.random.Generator = None,
-        antithetic_variates: bool = False,
-    ) -> Union[float, NDArray[float_]]:
-        """
-        Simulates the trajectory of stock or forward in the Black-Scholes model.
-
-        Args:
-            n_sample: number of simulated trajectories.
-            t_grid: time grid to simulate the price on.
-            init_val: the value of process at t = 0.
-            flag: "forward" to simulate forward price (without drift). "spot" to simulate spot price.
-            random_state: `np.random.Generator` used for simulation.
-            antithetic_variates: whether to use antithetic variantes in simulation. If True, the trajectories
-                in the second half of the sample will use the random numbers opposite to the ones used in the first half.
-
-        Returns:
-            np.ndarray of shape (n_sample, len(t_grid)) with simulated trajectories if model dimension is 1.
-            np.ndarray of shape (n_sample, dim, len(t_grid)) with simulated trajectories if model dimension greater than 1.
-        """
-        if isinstance(self.sigma, float) or isinstance(self.sigma, int):
-            dim = 1
-        else:
-            dim = len(self.sigma)
-        cov = self.sigma**2 if dim == 1 else self.sigma
-        drift = self.r if flag == "spot" else 0
-        traj = geometric_brownian_motion(
-            n_sample=n_sample,
-            t_grid=t_grid,
-            init_val=init_val,
-            drift=drift,
-            covariance=cov,
-            random_state=random_state,
-            antithetic_variates=antithetic_variates
-        )
-        return traj

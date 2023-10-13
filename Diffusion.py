@@ -67,6 +67,57 @@ class Diffusion:
         if W_traj.shape[2] != len(self.t_grid):
             raise ValueError("The shape of the new Brownian motion should match existing 't_grid' shape.")
 
+    def brownian_motion_increments(
+        self,
+        dims: Union[float, NDArray[float_]] = None,
+        squeeze: bool = False
+    ) -> NDArray[float_]:
+        """
+        Returns the increments of the underlying brownian motion.
+
+        Args:
+            dims: which dimensions of the underlying standard BM to use for simulation. By default all.
+            squeeze: whether to squeeze the output.
+        """
+        if dims is None:
+            dims = np.arange(self.dim)
+        dW = np.diff(
+            np.concatenate([np.zeros(self.W_traj[:, dims, :].shape[:2])[:, :, None], self.W_traj[:, dims, :]], axis=2),
+            axis=2
+        )
+        return dW.squeeze() if squeeze else dW
+
+    def integral_of_brownian_motion(
+        self,
+        T: float,
+        dims: Union[float, NDArray[float_]] = None,
+        squeeze: bool = False
+    ) -> NDArray[float_]:
+        """
+                  T
+        Simulates ∫ W_t dt given the trajectory of W_t on 't_grid'.
+                  0
+        Args:
+            T: upper limit of the integral.
+            dims: which dimensions of the underlying standard BM to use for simulation. By default all.
+            squeeze: whether to squeeze the output.
+        """
+        if dims is None:
+            dims = np.arange(self.dim)
+        dW = self.brownian_motion_increments(dims)
+        dt = np.diff(np.concatenate([[0], self.t_grid]))
+        beta = 0.5 * dt + (T - self.t_grid)
+        if T < np.max(self.t_grid):
+            idx_end = np.where(self.t_grid > T)[0][0]
+            dW = dW[:, :, :idx_end + 1]
+            dt = dt[:idx_end + 1]
+            beta = beta[:idx_end + 1]
+            beta[idx_end] = (T - self.t_grid[idx_end])**2 / (2 * dt[idx_end])
+        m = np.einsum('i,kji->kj', beta, dW)
+        v = T**3 / 3 - beta**2 @ dt
+        integral = np.sqrt(v) * self.rng.normal(size=dW.shape[:2]) + m
+        return integral.squeeze() if squeeze else integral
+
     def brownian_motion(
         self,
         init_val: Union[float, NDArray[float_]] = 0,
