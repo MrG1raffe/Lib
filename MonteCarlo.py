@@ -32,16 +32,16 @@ class MonteCarlo():
             accuracy: an error estimated via the CLT.
             axis: axis along which the mean to be computed
             control_variate: control variate to be added to sample with the appropriate weigh which is calculated
-                with the use of adaptive method. Assumed to have zero mean.
+                in such a manner that the estimator is unbiased. Assumed to have zero mean.
         """
+        self.size = sample.shape[axis]
         if control_variate is not None:
-            weights = self._adapted_weights(sample, control_variate)
+            weights = self._unbiased_weights(sample, control_variate)
             self.sample = sample - weights * control_variate
         else:
             self.sample = sample
         self.mean = np.mean(self.sample, axis=axis)
         self.var = np.var(self.sample, ddof=1, axis=axis)
-        self.size = self.sample.shape[axis]
         if confidence_level is not None and accuracy is not None:
             raise ValueError('Either accuracy or confidence level should be specified, not both.')
         if confidence_level is not None:
@@ -129,4 +129,27 @@ class MonteCarlo():
         weights = np.zeros_like(control_variate)
         v = np.cumsum(control_variate[:-1]**2)
         np.divide(np.cumsum(sample[:-1] * control_variate[:-1]), v, out=weights[1:], where=v > 0)
+        return weights
+
+    def _unbiased_weights(
+        self,
+        sample: NDArray[float_],
+        control_variate: NDArray[float_]
+    ) -> NDArray[float_]:
+        """
+        Calculates the control variate weights using unbiased method: for the k-th observation the weight
+        lambda_{-k} = cov(sample_{-k}, control_variate_{-k}) / var(control_variate_{-k}). Here array_{-k}
+        means array with all the elements excepth for k-th.
+        A new sample shall be calculated as 'sample - weights * control_variate'.
+
+        Args:
+            sample: array to compute the mean.
+            control_variate: array of control variates. Assumed to have zero mean.
+
+        Returns:
+            An array of weights corresponding to the given control variates.
+        """
+        weights = np.zeros_like(control_variate)
+        v = np.sum(control_variate**2) - control_variate**2
+        np.divide(np.sum(sample * control_variate) - sample * control_variate, v, out=weights, where=v > 0)
         return weights
