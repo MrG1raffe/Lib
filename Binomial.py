@@ -109,6 +109,6 @@ class Binomial():
         V[0] = payoff(S_T)
         for i in range(T):
             t = T - i - 1
-            S_t = S * (1 + self.u)**n[:t + 1] * (1 + self.d)**(T - n[:t + 1])
+            S_t = S * (1 + self.u)**n[:t + 1] * (1 + self.d)**(t - n[:t + 1])
             V[i + 1, :T - i] = np.maximum((p * V[i, 1:T + 1 - i] + q * V[i, :T - i]) / (1 + self.r), payoff(S_t))
         return V[-1, 0]
