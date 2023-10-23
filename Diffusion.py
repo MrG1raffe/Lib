@@ -2,6 +2,7 @@ import numpy as np
 from typing import Union
 from numpy.typing import NDArray
 from numpy import float_
+
 from utility import numpyze, DEFAULT_SEED
 from simulation import simulate_brownian_motion_from_increments
 
@@ -113,7 +114,6 @@ class Diffusion:
             dt = dt[:idx_end + 1]
             beta = beta[:idx_end + 1]
             beta[idx_end] = (T - self.t_grid[idx_end])**2 / (2 * dt[idx_end])
-        print(beta)
         m = np.einsum('i,kji->kj', beta, dW)
         v = T**3 / 3 - beta**2 @ dt
         integral = np.sqrt(v) * self.rng.normal(size=dW.shape[:2]) + m
