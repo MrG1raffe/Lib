@@ -14,6 +14,7 @@ class MonteCarlo():
     mean: Union[float, NDArray[float_]]
     var: Union[float, NDArray[float_]]
     size: int
+    axis: int
 
     def __init__(
         self,
@@ -34,6 +35,7 @@ class MonteCarlo():
             control_variate: control variate to be added to sample with the appropriate weigh which is calculated
                 in such a manner that the estimator is unbiased. Assumed to have zero mean.
         """
+        self.axis = axis
         self.size = sample.shape[axis]
         if control_variate is not None:
             weights = self._unbiased_weights(sample, control_variate)
@@ -150,6 +152,6 @@ class MonteCarlo():
             An array of weights corresponding to the given control variates.
         """
         weights = np.zeros_like(control_variate)
-        v = np.sum(control_variate**2) - control_variate**2
-        np.divide(np.sum(sample * control_variate) - sample * control_variate, v, out=weights, where=v > 0)
+        v = np.sum(control_variate**2, axis=self.axis, keepdims=True) - control_variate**2
+        np.divide(np.sum(sample * control_variate, axis=self.axis, keepdims=True) - sample * control_variate, v, out=weights, where=v > 0)
         return weights
