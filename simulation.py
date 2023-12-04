@@ -29,3 +29,8 @@ def simulate_brownian_motion_from_increments(
     dt = np.diff(np.concatenate([[0], t_grid]))
     dW = rng.normal(size=(size, dim, len(t_grid)))
     return np.cumsum(np.sqrt(dt) * dW, axis=2)
+
+
+# ToDo: Add simulation as a brownian bridge
+
+# ToDo: Add jump process simulation

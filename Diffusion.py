@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Union
+from typing import Union, Callable
 from numpy.typing import NDArray
 from numpy import float_
 
@@ -74,7 +74,8 @@ class Diffusion:
         squeeze: bool = False
     ) -> NDArray[float_]:
         """
-        Returns the increments of the underlying brownian motion.
+        Returns the increments of the underlying brownian motion of shape (size, len(dims), len(t_grid)). Additional point t = 0 is added
+        to the time grid to calculate the increments.
 
         Args:
             dims: which dimensions of the underlying standard BM to use for simulation. By default all.
@@ -87,37 +88,6 @@ class Diffusion:
             axis=2
         )
         return dW.squeeze() if squeeze else dW
-
-    def integral_of_brownian_motion(
-        self,
-        T: float,
-        dims: Union[float, NDArray[float_]] = None,
-        squeeze: bool = False
-    ) -> NDArray[float_]:
-        """
-                  T
-        Simulates ∫ W_t dt given the trajectory of W_t on 't_grid'.
-                  0
-        Args:
-            T: upper limit of the integral.
-            dims: which dimensions of the underlying standard BM to use for simulation. By default all.
-            squeeze: whether to squeeze the output.
-        """
-        if dims is None:
-            dims = np.arange(self.dim)
-        dW = self.brownian_motion_increments(dims)
-        dt = np.diff(np.concatenate([[0], self.t_grid]))
-        beta = 0.5 * dt + (T - self.t_grid)
-        if T < np.max(self.t_grid):
-            idx_end = np.where(self.t_grid > T)[0][0]
-            dW = dW[:, :, :idx_end + 1]
-            dt = dt[:idx_end + 1]
-            beta = beta[:idx_end + 1]
-            beta[idx_end] = (T - self.t_grid[idx_end])**2 / (2 * dt[idx_end])
-        m = np.einsum('i,kji->kj', beta, dW)
-        v = T**3 / 3 - beta**2 @ dt
-        integral = np.sqrt(v) * self.rng.normal(size=dW.shape[:2]) + m
-        return integral.squeeze() if squeeze else integral
 
     def brownian_motion(
         self,
@@ -140,7 +110,7 @@ class Diffusion:
             squeeze: whether to squeeze the output.
 
         Returns:
-            np.ndarray of shape (size, dim, len(t_grid)) with simulated trajectories.
+            np.ndarray of shape (size, len(dims), len(t_grid)) with simulated trajectories.
         """
         drift = numpyze(drift)
         init_val = numpyze(init_val)
@@ -176,7 +146,7 @@ class Diffusion:
             squeeze: whether to squeeze the output.
 
         Returns:
-            np.ndarray of shape (size, dim, len(t_grid)) with simulated trajectories.
+            np.ndarray of shape (size, len(dims), len(t_grid)) with simulated trajectories.
         """
         drift = numpyze(drift)
         init_val = numpyze(init_val)
@@ -192,3 +162,92 @@ class Diffusion:
         )
         traj = init_val[None, :, None] * np.exp(W)
         return traj.squeeze() if squeeze else traj
+
+    def ornstein_uhlenbeck(
+        self
+    ) -> Union[float, NDArray[float_]]:
+        """
+        ToDO: simulation of the OU consistent with given Brownian motion
+        """
+        raise NotImplementedError()
+
+    def diffusion_process_euler(
+        self,
+        dim: int,
+        init_val: Union[float, NDArray[float_]] = 0,
+        drift: Callable[[Union[float, NDArray[float_]], Union[float, NDArray[float_]]], Union[float, NDArray[float_]]] = lambda x: np.zeros_like(x),
+        vol: Callable[[Union[float, NDArray[float_]], Union[float, NDArray[float_]]], Union[float, NDArray[float_]]] = lambda x: np.zeros_like(x),
+        dims: Union[float, NDArray[float_]] = None,
+        squeeze: bool = False,
+    ) -> Union[float, NDArray[float_]]:
+        """
+        Simulates the trajectory of the solution to the SDE
+            dX_t = drift(t, X_t) dt + vol(t, X_t) @ dW_t,
+            X_0 = init_val,
+        via the Euler's scheme.
+
+        Args:
+            dim: dimensionality of the process X_t.
+            init_val: value of the process at t = 0.
+            drift: number or vector of size d representing the drift coefficient as a function of (t, x).
+            vol: volatility matrix as a function of (t, x).
+            dims: which dimensions of the underlying standard BM to use for simulation. By default all.
+            squeeze: whether to squeeze the output.
+
+        Returns:
+            np.ndarray of shape (size, len(dims), len(t_grid)) with simulated trajectories.
+        """
+        dt_array = np.diff(np.concatenate([[0], self.t_grid]))
+        dW_array = self.brownian_motion_increments(dims)  # shape (size, len(dims), len(t_grid)).
+        X = np.zeros((self.size, dim, len(self.t_grid)))
+        t_prev, x_prev = 0, init_val * np.ones_like(X[:, :, 0])
+        dim_W = dW_array.shape[1]
+        if vol(t_prev, x_prev).shape == (self.size, dim, dim_W):
+            ein_indices = 'ndq,nq->nd'
+        elif vol(t_prev, x_prev).shape == (dim, dim_W):
+            ein_indices = 'dq,nq->nd'
+        elif vol(t_prev, x_prev).shape == (dim_W,) and dim == 1:
+            ein_indices = 'q,nq->n'
+        elif vol(t_prev, x_prev).shape == (dim,) and dim_W == 1:
+            ein_indices = 'd,nq->nd'
+        elif vol(t_prev, x_prev).shape == (self.size, dim) and dim_W == 1:
+            ein_indices = 'nd,nq->nd'
+        else:
+            raise ValueError('Wrong shape of the volatility matrix.')
+        for i in range(len(self.t_grid)):
+            dt = dt_array[i]
+            dW = dW_array[:, :, i]  # shape (size, len(dims))
+            X[:, :, i] = x_prev + drift(t_prev, x_prev) * dt + np.einsum(ein_indices, vol(t_prev, x_prev), dW).reshape(x_prev.shape)
+            t_prev, x_prev = self.t_grid[i], X[:, :, i]
+        return X.squeeze() if squeeze else X
+
+    def integral_of_brownian_motion(
+        self,
+        T: float,
+        dims: Union[float, NDArray[float_]] = None,
+        squeeze: bool = False
+    ) -> NDArray[float_]:
+        """
+                  T
+        Simulates ∫ W_t dt given the trajectory of W_t on 't_grid'.
+                  0
+        Args:
+            T: upper limit of the integral.
+            dims: which dimensions of the underlying standard BM to use for simulation. By default all.
+            squeeze: whether to squeeze the output.
+        """
+        if dims is None:
+            dims = np.arange(self.dim)
+        dW = self.brownian_motion_increments(dims)
+        dt = np.diff(np.concatenate([[0], self.t_grid]))
+        beta = 0.5 * dt + (T - self.t_grid)
+        if T < np.max(self.t_grid):
+            idx_end = np.where(self.t_grid > T)[0][0]
+            dW = dW[:, :, :idx_end + 1]
+            dt = dt[:idx_end + 1]
+            beta = beta[:idx_end + 1]
+            beta[idx_end] = (T - self.t_grid[idx_end])**2 / (2 * dt[idx_end])
+        m = np.einsum('i,kji->kj', beta, dW)
+        v = T**3 / 3 - beta**2 @ dt
+        integral = np.sqrt(v) * self.rng.normal(size=dW.shape[:2]) + m
+        return integral.squeeze() if squeeze else integral
